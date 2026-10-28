@@ -3,6 +3,11 @@ const PORT=process.env.PORT||3000, DB=process.env.DB_FILE||path.join(__dirname,'
 function seed(){return{restaurants:[{id:'r_demo',slug:'demo',apiKey:'rk_demo_bella_2026',name:'Bella Vista Bistro',
  settings:{openDays:[2,3,4,5,6,0],open:'17:00',close:'22:00',slotMinutes:30,capacity:20,maxParty:8,closedDates:[],timezone:'America/Chicago'}}],bookings:[]};}
 let db; try{db=JSON.parse(fs.readFileSync(DB,'utf8'))}catch{db=seed();save()}
+const todayCT=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago'}).format(new Date());
+function demoSeed(){const d=todayCT();db.demoSeeded=db.demoSeeded||[];if(db.demoSeeded.includes(d))return;db.demoSeeded.push(d);
+ [['17:30',2,'Maria Lopez','(312) 555-0142','Anniversary'],['18:00',4,'The Chen family','(312) 555-0187','High chair please'],['19:00',2,'David Kim','(773) 555-0110',''],['19:30',6,'Sarah Johnson','(312) 555-0199','Birthday dinner'],['20:30',3,'Alex Rivera','(708) 555-0123','']]
+ .forEach(([time,partySize,name,phone,notes])=>db.bookings.push({id:'bk_'+crypto.randomBytes(5).toString('hex'),restaurantId:'r_demo',date:d,time,partySize,name,phone,notes,status:'confirmed',createdAt:new Date().toISOString()}));save()}
+demoSeed();setInterval(demoSeed,3600e3);
 function save(){fs.writeFileSync(DB,JSON.stringify(db,null,1))}
 const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m}, toT=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
