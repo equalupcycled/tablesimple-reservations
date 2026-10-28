@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="top"><a class="logo" href="/">TableSimple</a><div class="nav"><a href="/book/demo" id="bookLink">Booking page</a><a href="/docs">API</a><a href="#" id="logout">Log out</a></div></div>
+<div class="wrap">
+<div class="card" id="login"><h2>Restaurant login</h2><p class="muted">Enter your restaurant API key. Demo key: <code>rk_demo_bella_2026</code></p><input id="key" placeholder="rk_..."><button class="btn" id="loginBtn">Open dashboard</button><div class="err" id="lerr"></div></div>
+<div id="dash" hidden>
+<div class="card"><h1 id="rn"></h1><div class="muted">Public booking link: <a id="plink" target="_blank"></a></div></div>
+<div class="card"><h2>Bookings</h2><div class="row"><div><label>Day</label><input type="date" id="bday"></div><div><label>Summary</label><div id="sum" class="muted" style="padding-top:10px"></div></div></div><div id="blist" style="margin-top:12px"></div></div>
+<div class="card"><h2>Settings</h2><label>Restaurant name</label><input id="sname"><label>Open days</label><div class="days" id="sdays"></div>
+<div class="row"><div><label>Opens</label><input type="time" id="sopen"></div><div><label>Closes</label><input type="time" id="sclose"></div></div>
+<div class="row"><div><label>Slot length</label><select id="sslot"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">60 min</option><option value="90">90 min</option></select></div><div><label>Seats per slot</label><input type="number" min="1" id="scap"></div></div>
+<label>Max party size</label><input type="number" min="1" id="smax">
+<button class="btn" id="saveBtn">Save settings</button><div id="smsg" class="ok"></div></div>
+<div class="card"><h2>Closed dates</h2><div class="row"><input type="date" id="cdate"><button class="btn sm" id="addC" style="height:44px">Block date</button></div><div id="clist" style="margin-top:10px"></div></div>
+<div class="card"><h2>Embed on your website</h2><p class="muted">Paste into Wix, Shopify, Squarespace, WordPress… See <a href="/docs#embed">setup steps</a>.</p><label>Script tag (auto-height)</label><pre id="emb1"></pre><label>iframe</label><pre id="emb2"></pre></div>
+</div></div>
+<script>
+const $=id=>document.getElementById(id),DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];let K=localStorage.getItem('ts_key'),R;
+const api=(p,o={})=>fetch('/api/v1'+p,{...o,headers:{'X-API-Key':K,'Content-Type':'application/json'}}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error);return j});
+const fmtT=t=>{let[h,m]=t.split(':').map(Number);return((h%12)||12)+':'+String(m).padStart(2,'0')+(h<12?' AM':' PM')};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function load(){try{R=await api('/restaurant')}catch(e){$('lerr').textContent=e.message;return}localStorage.setItem('ts_key',K);$('login').hidden=true;$('dash').hidden=false;fill();loadB()}
+function fill(){const s=R.settings,u=location.origin+'/book/'+R.slug;$('rn').textContent=R.name;$('plink').href=u;$('plink').textContent=u;$('bookLink').href=u;
+ $('sname').value=R.name;$('sopen').value=s.open;$('sclose').value=s.close;$('sslot').value=s.slotMinutes;$('scap').value=s.capacity;$('smax').value=s.maxParty;
+ $('sdays').innerHTML=[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" value="${d}" ${s.openDays.includes(d)?'checked':''}>${DN[d]}</label>`).join('');
+ $('clist').innerHTML=s.closedDates.length?s.closedDates.sort().map(d=>`<span class="chip">${d} <a href="#" data-d="${d}">✕</a></span>`).join(''):'<span class="muted">No blocked dates.</span>';
+ $('clist').querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();saveS({closedDates:s.closedDates.filter(x=>x!==a.dataset.d)})});
+ $('emb1').textContent=`<script src="${location.origin}/widget.js" data-restaurant="${R.slug}"><\/script>`;
+ $('emb2').textContent=`<iframe src="${u}?embed=1" style="width:100%;height:900px;border:0" title="Book a table"></iframe>`}
+async function saveS(b){R=await api('/settings',{method:'PUT',body:JSON.stringify(b)});fill();loadB();$('smsg').textContent='Saved ✓';setTimeout(()=>$('smsg').textContent='',2000)}
+$('saveBtn').onclick=()=>saveS({name:$('sname').value,open:$('sopen').value,close:$('sclose').value,slotMinutes:+$('sslot').value,capacity:+$('scap').value,maxParty:+$('smax').value,openDays:[...$('sdays').querySelectorAll('input:checked')].map(i=>+i.value)}).catch(e=>alert(e.message));
+$('addC').onclick=()=>{const d=$('cdate').value;if(d&&!R.settings.closedDates.includes(d))saveS({closedDates:[...R.settings.closedDates,d]})};
+async function loadB(){const d=$('bday').value;const[{bookings},av]=await Promise.all([api('/bookings?date='+d),api('/availability?date='+d)]);
+ const cov=bookings.reduce((a,b)=>a+b.partySize,0);$('sum').textContent=av.open?`${bookings.length} bookings · ${cov} guests`:'Closed this day';
+ $('blist').innerHTML=bookings.length?'<table><tr><th>Time</th><th>Guest</th><th>Party</th><th></th></tr>'+bookings.map(b=>`<tr><td>${fmtT(b.time)}</td><td>${esc(b.name)}<br><span class="muted">${esc(b.phone)}${b.notes?' · '+esc(b.notes):''}</span></td><td>${b.partySize}</td><td><button class="btn sm ghost" data-id="${b.id}">Cancel</button></td></tr>`).join('')+'</table>':'<p class="muted">No bookings for this day.</p>';
+ $('blist').querySelectorAll('button').forEach(b=>b.onclick=async()=>{if(confirm('Cancel this booking?')){await api('/bookings/'+b.dataset.id,{method:'DELETE'});loadB()}})}
+$('bday').valueAsDate=new Date(Date.now()-new Date().getTimezoneOffset()*6e4);$('bday').onchange=loadB;
+$('loginBtn').onclick=()=>{K=$('key').value.trim();load()};$('logout').onclick=e=>{e.preventDefault();localStorage.removeItem('ts_key');location.reload()};
+if(K)load();else $('key').value='rk_demo_bella_2026';
+</script></body></html>

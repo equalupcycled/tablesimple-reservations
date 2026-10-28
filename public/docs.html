@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TableSimple API & Embed</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="top"><a class="logo" href="/">TableSimple</a><div class="nav"><a href="/book/demo">Booking page</a><a href="/dashboard">Dashboard</a></div></div>
+<div class="wrap"><div class="card"><h1>API &amp; Embed docs</h1><p class="muted">Base URL: <code class="B"></code> · Demo restaurant slug <code>demo</code> · Demo API key <code>rk_demo_bella_2026</code></p></div>
+<div class="card" id="embed"><h2>Embed the booking widget</h2>
+<label>Option A — script tag (auto-resizes)</label><pre>&lt;script src="<span class="B"></span>/widget.js" data-restaurant="demo"&gt;&lt;/script&gt;</pre>
+<label>Option B — iframe (works everywhere)</label><pre>&lt;iframe src="<span class="B"></span>/book/demo?embed=1" style="width:100%;height:900px;border:0" title="Book a table"&gt;&lt;/iframe&gt;</pre>
+<p class="muted">The widget posts <code>{type:"tablesimple:height"}</code> and <code>{type:"tablesimple:booked"}</code> messages to the parent page. Framing is allowed from any site.</p>
+<h2>Wix</h2><ol><li>In the Editor click <b>Add (+) → Embed Code → Embed HTML</b>.</li><li>Choose <b>Code</b>, paste Option A (or B), click <b>Update</b>.</li><li>Drag the box to full width and ~900px tall (Wix boxes have a fixed height, so give it room). Publish.</li></ol>
+<h2>Shopify</h2><ol><li><b>Online Store → Themes → Customize</b>, open the page you want.</li><li><b>Add section → Custom Liquid</b> (or "Custom HTML").</li><li>Paste Option A or B, Save. To use a dedicated page, create <b>Pages → Add page</b> "Reservations" and pick it in the customizer.</li></ol>
+<h2>Squarespace / WordPress</h2><p>Squarespace: add a <b>Code</b> block and paste. WordPress: add a <b>Custom HTML</b> block and paste.</p></div>
+<div class="card"><h2>Public endpoints (no key, CORS enabled)</h2>
+<pre>GET  /api/public/{slug}                       restaurant name + hours
+GET  /api/public/{slug}/availability?date=YYYY-MM-DD
+     → {"date","open":true,"slots":[{"time":"17:00","remaining":20},...]}
+POST /api/public/{slug}/bookings
+     {"date":"2026-11-06","time":"19:00","partySize":2,"name":"Ana","phone":"555-0100","notes":""}
+     → 201 {"id":"bk_...","status":"confirmed",...}  | 409 if full</pre></div>
+<div class="card"><h2>Restaurant endpoints (header <code>X-API-Key</code>)</h2>
+<pre>GET    /api/v1/restaurant                     full settings
+PUT    /api/v1/settings                       {name,openDays:[0-6],open:"17:00",close:"22:00",
+                                               slotMinutes,capacity,maxParty,closedDates:["YYYY-MM-DD"]}
+GET    /api/v1/availability?date=YYYY-MM-DD
+GET    /api/v1/bookings?date=YYYY-MM-DD       (omit date for all; &amp;includeCancelled=1)
+POST   /api/v1/bookings                       same body as public booking
+DELETE /api/v1/bookings/{id}                  cancels; frees the seats</pre>
+<label>Example</label><pre>curl -H "X-API-Key: rk_demo_bella_2026" "<span class="B"></span>/api/v1/bookings?date=2026-11-06"</pre>
+<p class="muted">openDays: 0=Sun … 6=Sat. Capacity is seats per time slot; a booking uses partySize seats.</p></div></div>
+<script>document.querySelectorAll('.B').forEach(e=>e.textContent=location.origin)</script></body></html>

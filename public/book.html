@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Book a table</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="top" id="topbar"><a class="logo" href="/">TableSimple</a><div class="nav"><a href="/dashboard">Dashboard</a><a href="/docs">API</a></div></div>
+<div class="wrap" id="app"><div class="card"><h1 id="rname">Loading…</h1><div class="muted" id="hours"></div></div>
+<div id="flow"><div class="card"><div class="cal-head"><button class="btn sm ghost" id="prev">‹</button><b id="mlabel"></b><button class="btn sm ghost" id="next">›</button></div><div class="cal" id="cal"></div></div>
+<div class="card" id="slotCard" hidden><h2>Pick a time <span class="muted" id="dlabel"></span></h2><div class="slots" id="slots"></div></div>
+<div class="card" id="formCard" hidden><h2>Your details</h2><label>Party size</label><select id="party"></select>
+<label>Name</label><input id="gname" autocomplete="name"><label>Phone</label><input id="phone" type="tel" autocomplete="tel"><label>Notes (optional)</label><input id="notes">
+<button class="btn" id="go">Reserve</button><div class="err" id="err"></div></div></div>
+<div class="card confirm" id="done" hidden></div></div>
+<script>
+const slug=location.pathname.split('/')[2]||'demo',Q=new URLSearchParams(location.search),embed=Q.has('embed'),API='/api/public/'+slug;
+if(embed){document.body.classList.add('embed');topbar.remove()}
+const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],$=id=>document.getElementById(id);let R,view=new Date(),selD=null,selT=null,last=0;
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const fmtT=t=>{let[h,m]=t.split(':').map(Number);return((h%12)||12)+':'+String(m).padStart(2,'0')+(h<12?' AM':' PM')};
+function height(){const h=document.documentElement.scrollHeight;if(h!==last){last=h;parent.postMessage({type:'tablesimple:height',slug,height:h},'*')}}
+new ResizeObserver(height).observe(document.body);
+async function init(){const r=await fetch(API);if(!r.ok){rname.textContent='Restaurant not found';return}R=await r.json();rname.textContent=R.name;
+ const s=R.settings;hours.textContent='Open '+s.openDays.slice().sort().map(d=>DN[d]).join(', ')+' · '+fmtT(s.open)+'–'+fmtT(s.close);
+ party.innerHTML=Array.from({length:s.maxParty},(_,i)=>`<option>${i+1}</option>`).join('');party.value=Math.min(2,s.maxParty);cal_()}
+function cal_(){const y=view.getFullYear(),m=view.getMonth(),t=new Date();t.setHours(0,0,0,0);mlabel.textContent=view.toLocaleString('en-US',{month:'long',year:'numeric'});
+ let h=DN.map(d=>`<div class="dn">${d[0]}</div>`).join('')+'<div></div>'.repeat(new Date(y,m,1).getDay());
+ for(let d=1;d<=new Date(y,m+1,0).getDate();d++){const dt=new Date(y,m,d),k=iso(dt),off=dt<t||!R.settings.openDays.includes(dt.getDay())||R.settings.closedDates.includes(k);
+  h+=`<button class="day${k===selD?' sel':''}" ${off?'disabled':''} data-d="${k}">${d}</button>`}
+ cal.innerHTML=h;cal.querySelectorAll('.day:not(:disabled)').forEach(b=>b.onclick=()=>pick(b.dataset.d))}
+async function pick(d){selD=d;selT=null;formCard.hidden=true;cal_();slotCard.hidden=false;dlabel.textContent=new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+ slots.innerHTML='<span class="muted">Loading…</span>';const a=await(await fetch(API+'/availability?date='+d)).json();const ps=+party.value;
+ const now=new Date();slots.innerHTML=a.slots.length?a.slots.map(s=>{const past=new Date(d+'T'+s.time)<now;return`<button class="slot" data-t="${s.time}" ${s.remaining<1||past?'disabled':''}>${fmtT(s.time)}<small>${past?'passed':s.remaining<1?'full':s.remaining+' seats left'}</small></button>`}).join(''):'<span class="muted">Closed this day.</span>';
+ slots.querySelectorAll('.slot:not(:disabled)').forEach(b=>b.onclick=()=>{selT=b.dataset.t;slots.querySelectorAll('.slot').forEach(x=>x.classList.toggle('sel',x===b));formCard.hidden=false;formCard.scrollIntoView({behavior:'smooth',block:'nearest'})})}
+prev.onclick=()=>{view.setMonth(view.getMonth()-1);cal_()};next.onclick=()=>{view.setMonth(view.getMonth()+1);cal_()};
+go.onclick=async()=>{err.textContent='';if(!gname.value.trim()||!phone.value.trim())return err.textContent='Please enter your name and phone.';go.disabled=true;
+ const r=await fetch(API+'/bookings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:selD,time:selT,partySize:+party.value,name:gname.value.trim(),phone:phone.value.trim(),notes:notes.value})});
+ const j=await r.json();go.disabled=false;if(!r.ok){err.textContent=j.error;pick(selD);return}
+ flow.hidden=true;done.hidden=false;done.innerHTML=`<div class="big">✓</div><h1>You're booked!</h1><p>${j.name}, party of ${j.partySize}<br><b>${new Date(j.date+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} at ${fmtT(j.time)}</b><br>${R.name}</p><p class="muted">Confirmation #${j.id.slice(3).toUpperCase()}</p><button class="btn ghost" onclick="location.reload()">Make another booking</button>`;
+ parent.postMessage({type:'tablesimple:booked',slug,booking:j},'*')};
+init();
+</script></body></html>
